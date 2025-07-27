@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>TRYELLE</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f0f2f5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      overflow: hidden;
+    }
+    .container {
+      position: relative;
+      width: 90%;
+      max-width: 600px;
+      border-radius: 1.5rem;
+      overflow: hidden;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      background-color: #ffffff;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    video, canvas {
+      display: block;
+      border-radius: 1rem;
+      background-color: #000;
+      width: 100%;
+      height: auto;
+    }
+    .message-box {
+      position: absolute;
+      top: 10%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 1rem 2rem;
+      border-radius: 0.75rem;
+      font-size: 1.25rem;
+      text-align: center;
+      z-index: 10;
+      transition: opacity 0.3s ease;
+    }
+    .hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .footer {
+      margin-top: 1rem;
+      text-align: center;
+      font-size: 0.875rem;
+      color: #6b7280;
+    }
+  </style>
+</head>
+<body>
+  <div class="container" role="region" aria-labelledby="title">
+    <h1 id="title" class="text-3xl font-bold mb-4 text-center text-gray-800">TRYELLE</h1>
+    <video id="video" class="hidden" playsinline autoplay></video>
+    <canvas id="canvas" class="w-full max-w-full h-auto"></canvas>
+    <div id="messageBox" class="message-box hidden" role="alert"></div>
+
+    <!-- ✅ Responsive Button Container -->
+    <div class="flex flex-wrap justify-center gap-3 w-full mt-6">
+      <button class="flex-1 min-w-[120px] px-4 py-2 rounded-md bg-indigo-600 text-white font-semibold hover:bg-indigo-700 hover:-translate-y-0.5 active:translate-y-0 shadow transition" onclick="switchOutfit('img/5.png')">Outfit 1</button>
+      <button class="flex-1 min-w-[120px] px-4 py-2 rounded-md bg-indigo-600 text-white font-semibold hover:bg-indigo-700 hover:-translate-y-0.5 active:translate-y-0 shadow transition" onclick="switchOutfit('img/outfit1.png')">Outfit 2</button>
+      <button class="flex-1 min-w-[120px] px-4 py-2 rounded-md bg-indigo-600 text-white font-semibold hover:bg-indigo-700 hover:-translate-y-0.5 active:translate-y-0 shadow transition" onclick="switchOutfit('img/3.png')">Outfit 3</button>
+    </div>
+
+    <div class="footer">
+      <p>&copy; 2025 TRYELLE. All rights reserved.</p>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const messageBox = document.getElementById('messageBox');
+
+    let SHIRT_IMAGE_PATH = 'img/5.png';
+    const MIN_SHIRT_WIDTH = 80;
+    const MAX_SHIRT_WIDTH_FACTOR = 0.8;
+
+    const shirtImg = new Image();
+    let shirtLoaded = false;
+    let poseDetector;
+
+    function resizeCanvasToDisplaySize() {
+      const displayWidth = canvas.clientWidth;
+      const displayHeight = canvas.clientHeight;
+      if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
+        canvas.width = displayWidth;
+        canvas.height = displayHeight;
+      }
+    }
+
+    function showMessage(message, type = 'info') {
+      messageBox.textContent = message;
+      messageBox.classList.remove('hidden');
+      messageBox.classList.add('visible');
+      messageBox.style.backgroundColor =
+        type === 'error' ? 'rgba(255, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.7)';
+    }
+
+    function hideMessage() {
+      messageBox.classList.remove('visible');
+      messageBox.classList.add('hidden');
+    }
+
+    shirtImg.onload = () => {
+      shirtLoaded = true;
+      console.log("👕 Shirt image loaded.");
+      hideMessage();
+    };
+
+    shirtImg.onerror = () => {
+      console.error("❌ Failed to load shirt:", SHIRT_IMAGE_PATH);
+      showMessage('Failed to load shirt image. Check console.', 'error');
+    };
+
+    shirtImg.src = SHIRT_IMAGE_PATH;
+
+    async function initializePoseDetector() {
+      try {
+        poseDetector = new Pose({
+          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+        });
+
+        poseDetector.setOptions({
+          modelComplexity: 1,
+          smoothLandmarks: true,
+          enableSegmentation: false,
+          minDetectionConfidence: 0.5,
+          minTrackingConfidence: 0.5
+        });
+
+        poseDetector.onResults(onPoseResults);
+        console.log("✅ MediaPipe Pose initialized.");
+        hideMessage();
+      } catch (error) {
+        console.error("❌ Error initializing Pose:", error);
+        showMessage('Pose initialization failed. Check console.', 'error');
+      }
+    }
+
+    function onPoseResults(results) {
+      resizeCanvasToDisplaySize();
+      const width = canvas.width;
+      const height = canvas.height;
+
+      ctx.clearRect(0, 0, width, height);
+      ctx.save();
+      ctx.scale(-1, 1);
+      ctx.drawImage(results.image, -width, 0, width, height);
+      ctx.restore();
+
+      if (results.poseLandmarks && shirtLoaded) {
+        const lm = results.poseLandmarks;
+
+        const leftShoulder = { x: (1 - lm[11].x) * width, y: lm[11].y * height };
+        const rightShoulder = { x: (1 - lm[12].x) * width, y: lm[12].y * height };
+        const leftHip = { x: (1 - lm[23].x) * width, y: lm[23].y * height };
+        const rightHip = { x: (1 - lm[24].x) * width, y: lm[24].y * height };
+
+        const shoulderMid = {
+          x: (leftShoulder.x + rightShoulder.x) / 2,
+          y: (leftShoulder.y + rightShoulder.y) / 2
+        };
+        const hipMid = {
+          x: (leftHip.x + rightHip.x) / 2,
+          y: (leftHip.y + rightHip.y) / 2
+        };
+
+        const shoulderWidth = Math.abs(rightShoulder.x - leftShoulder.x);
+        const torsoHeight = Math.abs(hipMid.y - shoulderMid.y);
+
+        let shirtWidth = shoulderWidth * 1.4;
+        const maxWidth = width * MAX_SHIRT_WIDTH_FACTOR;
+        shirtWidth = Math.max(MIN_SHIRT_WIDTH, Math.min(maxWidth, shirtWidth));
+        let shirtHeight = torsoHeight * 1.6 * (shirtWidth / (shoulderWidth * 1.4));
+
+        const shirtX = Math.round(shoulderMid.x - shirtWidth / 2);
+        const shirtY = Math.round(shoulderMid.y - shirtHeight * 0.15);
+
+        ctx.drawImage(shirtImg, shirtX, shirtY, shirtWidth, shirtHeight);
+        hideMessage();
+      } else if (!shirtLoaded) {
+        showMessage('Loading shirt image...', 'info');
+      } else {
+        showMessage('No person detected. Please stand in front of the camera.', 'info');
+      }
+    }
+
+    async function startWebcam() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+        video.srcObject = stream;
+        video.onloadedmetadata = () => {
+          video.play();
+          console.log("🎥 Webcam started.");
+          hideMessage();
+          requestAnimationFrame(sendPoseToDetector);
+        };
+      } catch (err) {
+        console.error('❌ Webcam error:', err);
+        showMessage('Cannot access webcam. Grant permission or close other apps.', 'error');
+      }
+    }
+
+    async function sendPoseToDetector() {
+      if (poseDetector && video.readyState === video.HAVE_ENOUGH_DATA) {
+        await poseDetector.send({ image: video });
+      }
+      requestAnimationFrame(sendPoseToDetector);
+    }
+
+    function switchOutfit(imagePath) {
+      SHIRT_IMAGE_PATH = imagePath;
+      shirtImg.src = SHIRT_IMAGE_PATH;
+      shirtLoaded = false;
+      showMessage('Loading new shirt image...', 'info');
+    }
+
+    async function init() {
+      showMessage('Initializing webcam and pose detection...', 'info');
+      await initializePoseDetector();
+      startWebcam();
+    }
+
+    init();
+  </script>
+</body>
+</html>
