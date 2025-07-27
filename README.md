@@ -1,4 +1,4 @@
-# 👕 TRYELLE - Virtual Try-On Web App
+# 👕 TRYELLE - Virtual Try-On Website
 
 **TRYELLE** is a browser-based virtual try-on application that uses **MediaPipe Pose** and **JavaScript** to let users try different clothing outfits in real time using their webcam.
 
