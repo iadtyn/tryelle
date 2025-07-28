@@ -57,8 +57,7 @@ cd Tryelle
 
 ## 🌐 Live Demo
 
-> Coming soon on GitHub Pages or Vercel  
-> _Want help deploying it? Let me know!_
+https://tryelle.vercel.app/
 
 ---
 
