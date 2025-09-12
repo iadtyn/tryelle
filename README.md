@@ -65,7 +65,7 @@ https://tryelle.vercel.app/
 
 - MediaPipe by Google  
 - Tailwind CSS  
-- Developed by [@omkarr10](https://github.com/omkarr10) & [@adtyan](https://github.com/adtyan)
+- Developed by [@omkarr10](https://github.com/omkarr10) & [@iadtyn](https://github.com/iadtyn)
 
 ---
 
